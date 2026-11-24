@@ -90,49 +90,59 @@ def preprocess_image(image):
 
 def process_result(output):
 
-    # Output có dạng [1, 7, 2100]
     predictions = output[0]
+
+    print("\n===== YOLO DEBUG =====")
+    print("Shape:", predictions.shape)
 
     if predictions.shape[0] != 7:
         raise ValueError(
             f"Output không đúng định dạng: {predictions.shape}"
         )
 
-    num_boxes = predictions.shape[1]
+    candidates = []
 
-    best_score = 0
-    best_class = -1
+    for i in range(predictions.shape[1]):
 
-    for i in range(num_boxes):
-
-        cx = predictions[0, i]
-        cy = predictions[1, i]
-        w = predictions[2, i]
-        h = predictions[3, i]
+        cx, cy, w, h = predictions[:4, i]
 
         class_scores = predictions[4:7, i]
 
         class_id = int(np.argmax(class_scores))
         score = float(class_scores[class_id])
 
-        if w <= 20 or h <= 20:
-            continue
+        candidates.append({
+            "index": i,
+            "class_id": class_id,
+            "score": score,
+            "cx": float(cx),
+            "cy": float(cy),
+            "w": float(w),
+            "h": float(h)
+        })
 
-        if cx - w / 2 < 0 or cy - h / 2 < 0:
-            continue
+    candidates.sort(
+        key=lambda x: x["score"],
+        reverse=True
+    )
 
-        if score > best_score:
-            best_score = score
-            best_class = class_id
+    for item in candidates[:10]:
+        print(item)
 
-    if best_class == -1 or best_score < CONFIDENCE_THRESHOLD:
+    print("======================")
+
+    best = candidates[0]
+
+    if best["score"] < CONFIDENCE_THRESHOLD:
         return None
 
+    class_id = best["class_id"]
+
     return {
-        "class_id": best_class,
-        "label": CLASS_NAMES[best_class],
-        "command": CLASS_COMMANDS[best_class],
-        "confidence": round(best_score, 4)
+        "class_id": class_id,
+        "label": CLASS_NAMES[class_id],
+        "command": CLASS_COMMANDS[class_id],
+        "confidence": round(best["score"], 4)
     }
 
 
